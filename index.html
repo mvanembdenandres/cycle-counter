@@ -160,6 +160,13 @@
             opacity: 0.8;
         }
 
+        .persistence-info {
+            margin-top: 15px;
+            font-size: 12px;
+            opacity: 0.6;
+            font-style: italic;
+        }
+
         @media (max-width: 480px) {
             .app-container {
                 padding: 30px 20px;
@@ -201,55 +208,139 @@
         
         <button class="reset-btn" id="resetBtn">Reset Counter</button>
         
-        <div class="stats" id="stats">
-            Total sessions: 0
-        </div>
+        <div class="stats" id="stats">Total sessions: 0</div>
+        <div class="persistence-info" id="persistenceInfo">Data saves automatically</div>
     </div>
 
     <script>
-        // Try localStorage first, fallback to memory storage
-        function loadData() {
-            try {
-                const savedCount = localStorage.getItem('cycleCount');
-                const savedSessions = localStorage.getItem('totalSessions');
-                return {
-                    count: savedCount ? parseInt(savedCount) : 0,
-                    totalSessions: savedSessions ? parseInt(savedSessions) : 0
-                };
-            } catch (e) {
-                // Fallback to URL hash storage if localStorage fails
-                const hash = window.location.hash.substring(1);
-                if (hash) {
-                    const parts = hash.split('-');
-                    return {
-                        count: parseInt(parts[0]) || 0,
-                        totalSessions: parseInt(parts[1]) || 0
-                    };
-                }
-                return { count: 0, totalSessions: 0 };
-            }
-        }
-        
-        function saveData() {
-            try {
-                localStorage.setItem('cycleCount', count.toString());
-                localStorage.setItem('totalSessions', totalSessions.toString());
-            } catch (e) {
-                // Fallback to URL hash if localStorage fails
-                window.location.hash = `${count}-${totalSessions}`;
-            }
-        }
-        
-        // Load saved data or use defaults
-        const savedData = loadData();
-        let count = savedData.count;
-        let totalSessions = savedData.totalSessions;
+        // Multi-layered storage approach
+        let count = 0;
+        let totalSessions = 0;
         
         const counterDisplay = document.getElementById('counter');
         const yesBtn = document.getElementById('yesBtn');
         const noBtn = document.getElementById('noBtn');
         const resetBtn = document.getElementById('resetBtn');
         const statsDisplay = document.getElementById('stats');
+        const persistenceInfo = document.getElementById('persistenceInfo');
+        
+        // Try multiple storage methods
+        function saveData() {
+            const dataString = `${count},${totalSessions}`;
+            let saved = false;
+            
+            // Method 1: localStorage
+            try {
+                localStorage.setItem('cycleData', dataString);
+                saved = true;
+                persistenceInfo.textContent = 'Data saved (localStorage)';
+            } catch (e) {
+                console.log('localStorage failed:', e.message);
+            }
+            
+            // Method 2: sessionStorage
+            if (!saved) {
+                try {
+                    sessionStorage.setItem('cycleData', dataString);
+                    saved = true;
+                    persistenceInfo.textContent = 'Data saved (session only)';
+                } catch (e) {
+                    console.log('sessionStorage failed:', e.message);
+                }
+            }
+            
+            // Method 3: URL hash
+            if (!saved) {
+                try {
+                    window.location.hash = `c${count}s${totalSessions}`;
+                    saved = true;
+                    persistenceInfo.textContent = 'Data saved (URL)';
+                } catch (e) {
+                    console.log('URL hash failed:', e.message);
+                }
+            }
+            
+            // Method 4: Cookie
+            if (!saved) {
+                try {
+                    document.cookie = `cycleData=${dataString};path=/;max-age=31536000;SameSite=Strict`;
+                    saved = true;
+                    persistenceInfo.textContent = 'Data saved (cookie)';
+                } catch (e) {
+                    console.log('Cookie failed:', e.message);
+                }
+            }
+            
+            if (!saved) {
+                persistenceInfo.textContent = 'Data not persistent (memory only)';
+            }
+        }
+        
+        function loadData() {
+            let dataString = null;
+            
+            // Method 1: localStorage
+            try {
+                dataString = localStorage.getItem('cycleData');
+                if (dataString) {
+                    persistenceInfo.textContent = 'Data loaded (localStorage)';
+                }
+            } catch (e) {
+                console.log('localStorage read failed:', e.message);
+            }
+            
+            // Method 2: sessionStorage
+            if (!dataString) {
+                try {
+                    dataString = sessionStorage.getItem('cycleData');
+                    if (dataString) {
+                        persistenceInfo.textContent = 'Data loaded (session)';
+                    }
+                } catch (e) {
+                    console.log('sessionStorage read failed:', e.message);
+                }
+            }
+            
+            // Method 3: URL hash
+            if (!dataString && window.location.hash) {
+                try {
+                    const hash = window.location.hash.substring(1);
+                    const countMatch = hash.match(/c(\d+)/);
+                    const sessionMatch = hash.match(/s(\d+)/);
+                    if (countMatch && sessionMatch) {
+                        dataString = `${countMatch[1]},${sessionMatch[1]}`;
+                        persistenceInfo.textContent = 'Data loaded (URL)';
+                    }
+                } catch (e) {
+                    console.log('URL hash read failed:', e.message);
+                }
+            }
+            
+            // Method 4: Cookie
+            if (!dataString) {
+                try {
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        const [name, value] = cookie.trim().split('=');
+                        if (name === 'cycleData') {
+                            dataString = value;
+                            persistenceInfo.textContent = 'Data loaded (cookie)';
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Cookie read failed:', e.message);
+                }
+            }
+            
+            if (dataString) {
+                const parts = dataString.split(',');
+                count = parseInt(parts[0]) || 0;
+                totalSessions = parseInt(parts[1]) || 0;
+            } else {
+                persistenceInfo.textContent = 'New session started';
+            }
+        }
         
         function updateDisplay() {
             counterDisplay.textContent = count;
@@ -315,7 +406,8 @@
             lastTouchEnd = now;
         }, false);
         
-        // Initialize display
+        // Initialize app
+        loadData();
         updateDisplay();
     </script>
 </body>
