@@ -207,38 +207,49 @@
     </div>
 
     <script>
+        // Try localStorage first, fallback to memory storage
+        function loadData() {
+            try {
+                const savedCount = localStorage.getItem('cycleCount');
+                const savedSessions = localStorage.getItem('totalSessions');
+                return {
+                    count: savedCount ? parseInt(savedCount) : 0,
+                    totalSessions: savedSessions ? parseInt(savedSessions) : 0
+                };
+            } catch (e) {
+                // Fallback to URL hash storage if localStorage fails
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    const parts = hash.split('-');
+                    return {
+                        count: parseInt(parts[0]) || 0,
+                        totalSessions: parseInt(parts[1]) || 0
+                    };
+                }
+                return { count: 0, totalSessions: 0 };
+            }
+        }
+        
+        function saveData() {
+            try {
+                localStorage.setItem('cycleCount', count.toString());
+                localStorage.setItem('totalSessions', totalSessions.toString());
+            } catch (e) {
+                // Fallback to URL hash if localStorage fails
+                window.location.hash = `${count}-${totalSessions}`;
+            }
+        }
+        
         // Load saved data or use defaults
-        let count = parseInt(getCookie('cycleCount')) || 0;
-        let totalSessions = parseInt(getCookie('totalSessions')) || 0;
+        const savedData = loadData();
+        let count = savedData.count;
+        let totalSessions = savedData.totalSessions;
         
         const counterDisplay = document.getElementById('counter');
         const yesBtn = document.getElementById('yesBtn');
         const noBtn = document.getElementById('noBtn');
         const resetBtn = document.getElementById('resetBtn');
         const statsDisplay = document.getElementById('stats');
-        
-        // Cookie functions for data persistence
-        function setCookie(name, value, days = 365) {
-            const expires = new Date();
-            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-            document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Strict`;
-        }
-        
-        function getCookie(name) {
-            const nameEQ = name + "=";
-            const ca = document.cookie.split(';');
-            for(let i = 0; i < ca.length; i++) {
-                let c = ca[i];
-                while (c.charAt(0) === ' ') c = c.substring(1, c.length);
-                if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
-            }
-            return null;
-        }
-        
-        function saveData() {
-            setCookie('cycleCount', count);
-            setCookie('totalSessions', totalSessions);
-        }
         
         function updateDisplay() {
             counterDisplay.textContent = count;
